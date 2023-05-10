@@ -6,45 +6,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
-	m "tgbot_internship_vk/internal/model"
+	h "tgbot_internship_vk/internal/handler"
 
 	"time"
 )
 
 type App struct {
-	token  string
-	runing bool
-}
-
-var keyboard = m.ReplyMarkup{
-	Keyboard: [][]m.KeyboardButton{
-		{
-			{
-				Text: "Кнопка 1",
-			},
-			{
-				Text: "Кнопка 2",
-			},
-			{
-				Text: "Кнопка 3",
-			},
-			{
-				Text: "Кнопка 4",
-			},
-		},
-		{
-			{
-				Text: "Кнопка 5",
-			},
-			{
-				Text: "Кнопка 6",
-			},
-		},
-	},
-	ResizeKeyboard:  true,
-	OneTimeKeyboard: true,
-	IsPersistent:    true,
+	token   string
+	runing  bool
+	handler h.Handler
 }
 
 func (a *App) sendMessage(messageBytes []byte) error {
@@ -85,57 +55,25 @@ func (a *App) Run() {
 		}
 		defer response.Body.Close()
 
-		if response.StatusCode != http.StatusOK {
-			fmt.Printf("API Telegram вернул ошибку с кодом: %d\n", response.StatusCode)
+		message, err := a.handler.Control(response, &lastId)
+		if err != nil {
+			log.Println(err)
 			continue
 		}
 
-		data := m.Data{}
-
-		if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-			fmt.Println(err)
+		messageBytes, err := json.Marshal(message)
+		if err != nil {
+			log.Println(err)
 			continue
 		}
-		for _, update := range data.Result {
 
-			if lastId < update.UpdateID {
-				log.Printf("Пользователь: %s, текст: %s", update.Message.From.Username, update.Message.Text)
-				message := m.Message{}
-
-				if update.Message.Text == "/start" {
-					message = m.Message{
-						ChatId:      update.Message.From.Id,
-						Text:        update.Message.From.Username + ", добро пожаловать!",
-						ReplyMarkup: &keyboard,
-					}
-				} else if strings.HasPrefix(update.Message.Text, "Кнопка") {
-					message = m.Message{
-						ChatId:      update.Message.From.Id,
-						Text:        "Вы нажали: " + update.Message.Text,
-						ReplyMarkup: &keyboard,
-					}
-				} else {
-					message = m.Message{
-						ChatId:      update.Message.From.Id,
-						Text:        "Вы ввели: " + update.Message.Text,
-						ReplyMarkup: &keyboard,
-					}
-				}
-
-				messageBytes, err := json.Marshal(message)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				lastId = update.UpdateID
-				err = a.sendMessage(messageBytes)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-			}
+		err = a.sendMessage(messageBytes)
+		if err != nil {
+			log.Println(err)
+			continue
 		}
 	}
+
 }
 
 func (a *App) Shutdown() {

@@ -6,6 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	h "tgbot_internship_vk/internal/handler"
+
 	"github.com/joho/godotenv"
 )
 
@@ -24,7 +26,12 @@ func main() {
 		log.Fatal("в файле .env не указаны переменные окружения: TOKEN")
 	}
 
-	app = App{token: token}
+	handler := h.Handler{}
+
+	app = App{
+		token:   token,
+		handler: handler,
+	}
 
 	go func() {
 		app.runing = true
